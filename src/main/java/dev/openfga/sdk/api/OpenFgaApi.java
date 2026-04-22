@@ -91,6 +91,7 @@ public class OpenFgaApi {
 
         if (configuration.getCredentials().getCredentialsMethod() == CredentialsMethod.CLIENT_CREDENTIALS) {
             this.oAuth2Client = new OAuth2Client(configuration, apiClient);
+            apiClient.setOAuth2Client(this.oAuth2Client);
         } else {
             this.oAuth2Client = null;
         }
@@ -1346,20 +1347,6 @@ public class OpenFgaApi {
      * @throws IllegalStateException when the configuration is invalid
      */
     private String getAccessToken(Configuration configuration) throws ApiException {
-        CredentialsMethod credentialsMethod = configuration.getCredentials().getCredentialsMethod();
-
-        if (credentialsMethod == CredentialsMethod.API_TOKEN) {
-            return configuration.getCredentials().getApiToken().getToken();
-        }
-
-        if (credentialsMethod == CredentialsMethod.CLIENT_CREDENTIALS) {
-            try {
-                return oAuth2Client.getAccessToken().get();
-            } catch (Exception e) {
-                throw new ApiException(e);
-            }
-        }
-
-        throw new IllegalStateException("Configuration is invalid.");
+        return apiClient.getAccessToken(configuration);
     }
 }
