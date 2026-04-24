@@ -173,3 +173,7 @@ tasks.register('test-integration') {
 tasks.named('check').configure {
     dependsOn 'spotlessCheck'
 }
+
+// E2E streaming auth test — lives in e2e-test/ (outside the normal test source set)
+// to avoid pulling Docker-dependent code into `./gradlew test`.
+// Usage: cd e2e-test && make test

@@ -6,6 +6,7 @@ import static org.mockito.Mockito.*;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.openfga.sdk.api.configuration.ApiToken;
 import dev.openfga.sdk.api.configuration.ClientConfiguration;
 import dev.openfga.sdk.api.configuration.Credentials;
 import dev.openfga.sdk.api.model.ListObjectsRequest;
@@ -46,6 +47,7 @@ public class StreamingApiExecutorTest {
         mockHttpClient = mock(HttpClient.class);
         var mockHttpClientBuilder = mock(HttpClient.Builder.class);
         when(mockHttpClientBuilder.executor(any())).thenReturn(mockHttpClientBuilder);
+        when(mockHttpClientBuilder.connectTimeout(any())).thenReturn(mockHttpClientBuilder);
         when(mockHttpClientBuilder.build()).thenReturn(mockHttpClient);
 
         ClientConfiguration clientConfiguration = new ClientConfiguration()
@@ -354,6 +356,43 @@ public class StreamingApiExecutorTest {
     // -----------------------------------------------------------------------
     // Chaining & CompletableFuture semantics
     // -----------------------------------------------------------------------
+
+    @Test
+    public void stream_appliesApiTokenAuthHeader() throws Exception {
+        // Regression guard for openfga/java-sdk#330: the streaming path must attach
+        // Authorization: Bearer <token> when the configuration uses API_TOKEN credentials.
+        String apiToken = "stream-api-token";
+
+        // Use a real ApiClient backed by the same mockHttpClient so applyAuthHeader runs for real.
+        var authBuilder = mock(HttpClient.Builder.class);
+        when(authBuilder.executor(any())).thenReturn(authBuilder);
+        when(authBuilder.connectTimeout(any())).thenReturn(authBuilder);
+        when(authBuilder.build()).thenReturn(mockHttpClient);
+        ApiClient realApiClient = new ApiClient(authBuilder, new ObjectMapper());
+
+        ClientConfiguration authConfig = new ClientConfiguration()
+                .storeId(DEFAULT_STORE_ID)
+                .authorizationModelId(DEFAULT_AUTH_MODEL_ID)
+                .apiUrl(FgaConstants.TEST_API_URL)
+                .credentials(new Credentials(new ApiToken(apiToken)))
+                .readTimeout(Duration.ofMillis(250));
+        OpenFgaClient authFga = new OpenFgaClient(authConfig, realApiClient);
+
+        Stream<String> lines = Stream.of("{\"result\":{\"object\":\"document:1\"}}");
+        HttpResponse<Stream<String>> mockResponse = mockStreamResponse(200, lines);
+        when(mockHttpClient.<Stream<String>>sendAsync(any(), any()))
+                .thenReturn(CompletableFuture.completedFuture(mockResponse));
+
+        authFga.streamingApiExecutor(StreamedListObjectsResponse.class).stream(
+                        buildStreamedListObjectsRequest(), obj -> {})
+                .get();
+
+        ArgumentCaptor<HttpRequest> captor = ArgumentCaptor.forClass(HttpRequest.class);
+        verify(mockHttpClient, times(1)).sendAsync(captor.capture(), any());
+        assertEquals(
+                "Bearer " + apiToken,
+                captor.getValue().headers().firstValue("Authorization").orElse(null));
+    }
 
     @Test
     public void stream_supportsChaining() throws Exception {

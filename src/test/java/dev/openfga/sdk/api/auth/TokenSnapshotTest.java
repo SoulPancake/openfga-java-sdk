@@ -9,7 +9,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
-class AccessTokenTest {
+class TokenSnapshotTest {
 
     private static Stream<Arguments> expTimeAndResults() {
         return Stream.of(
@@ -38,10 +38,8 @@ class AccessTokenTest {
 
     @MethodSource("expTimeAndResults")
     @ParameterizedTest(name = "{0}")
-    public void testTokenValid(String name, Instant exp, boolean valid) {
-        AccessToken accessToken = new AccessToken();
-        accessToken.setToken("token");
-        accessToken.setExpiresAt(exp);
-        assertEquals(valid, accessToken.isValid());
+    void testTokenValid(String name, Instant exp, boolean valid) {
+        TokenSnapshot snapshot = new TokenSnapshot("token", exp);
+        assertEquals(valid, snapshot.isValid());
     }
 }
